@@ -1,0 +1,271 @@
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Window = Rayfield:CreateWindow({
+   Name = "ShadowZ",
+   LoadingTitle = "Loading ShadowZ Boxing Beta Script",
+   LoadingSubtitle = "by Fearz",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "ShadowZ_Config",
+      FileName = "ShadowZ_Config"
+   },
+   Discord = {
+      Enabled = true,
+      Invite = "V6cpWCYN",
+      RememberJoins = true
+   },
+   KeySystem = false
+})
+
+-- Create Tabs
+local CombatTab = Window:CreateTab("🥊 Combat", 4483362458)
+local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+local CreditTab = Window:CreateTab("📜 Credits", 4483362458)
+
+-- Add Label
+CombatTab:CreateLabel("Boxing Beta Script V1.5")
+
+-- Variables for functionality
+local AutoPunchEnabled = false
+local PunchDelay = 0.2  -- Default Punch Delay
+local PunchRange = 10 -- Define range for detecting nearby players
+local AutoBlockEnabled = false
+local FPSBoostEnabled = false
+local IsDodging = false -- Track if player is dodging
+local AutoDodgeEnabled = false -- Track if AutoDodge is enabled
+
+-- Function to check for nearby players
+local function GetNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = PunchRange
+
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myPosition = LocalPlayer.Character.HumanoidRootPart.Position
+
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") then
+                local targetPosition = player.Character.HumanoidRootPart.Position
+                local distance = (myPosition - targetPosition).Magnitude
+
+                if distance <= shortestDistance then
+                    shortestDistance = distance
+                    nearestPlayer = player
+                end
+            end
+        end
+    end
+
+    return nearestPlayer
+end
+
+-- Auto Punch Function
+local function AutoPunch()
+    while AutoPunchEnabled do
+        local target = GetNearestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
+            local args = {
+                [1] = target.Character,
+                [3] = "back",
+                [4] = true,
+                [5] = "Left"
+            }
+            ReplicatedStorage:WaitForChild("CombatRemotesRemotes"):WaitForChild("Damage3Event"):FireServer(unpack(args))
+        end
+        task.wait(PunchDelay)
+    end
+end
+
+-- Auto Block Function (Now allows dodging)
+local function AutoBlock()
+    while AutoBlockEnabled do
+        if not IsDodging then -- Only block if not dodging
+            local args = {"blockStart"}
+            ReplicatedStorage:WaitForChild("CombatRemotesRemotes"):WaitForChild("BlockEvent"):FireServer(unpack(args))
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Auto Dodge Function
+local function AutoDodge()
+    while AutoDodgeEnabled do
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local myPosition = LocalPlayer.Character.HumanoidRootPart.Position
+            local nearestPlayer = GetNearestPlayer() -- Check for nearby players
+            
+            if nearestPlayer then
+                -- Check if the nearest player is attacking (You can adjust the condition based on game mechanics)
+                local attackAnimation = nearestPlayer.Character:FindFirstChild("Humanoid") and nearestPlayer.Character.Humanoid:FindFirstChild("Animator") and nearestPlayer.Character.Humanoid.Animator.AnimationPlayed
+
+                if attackAnimation then
+                    -- Dodge logic (right, left, backward, etc.)
+                    local dodgeDirection = "right"  -- You can change this to "left", "back", etc., based on your game logic
+                    local args = { dodgeDirection }
+                    game:GetService("ReplicatedStorage"):WaitForChild("CombatRemotesRemotes"):WaitForChild("DodgeEvent"):FireServer(unpack(args))
+                    task.wait(0.2)  -- Dodge time
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end
+
+-- Detect when player dodges & temporarily disable auto block
+LocalPlayer.CharacterAdded:Connect(function(character)
+    local humanoid = character:WaitForChild("Humanoid")
+
+    humanoid.StateChanged:Connect(function(_, newState)
+        if newState == Enum.HumanoidStateType.Physics then
+            IsDodging = true
+            task.wait(0.5) -- Wait for dodge to finish
+            IsDodging = false
+        end
+    end)
+end)
+
+-- FPS Boost Function
+local function FPSBoost()
+    if FPSBoostEnabled then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Part") or v:IsA("MeshPart") or v:IsA("UnionOperation") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            end
+        end
+    end
+end
+
+-- Combat Toggles
+CombatTab:CreateToggle({
+    Name = "Auto Punch",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoPunchEnabled = Value
+        if Value then
+            task.spawn(AutoPunch)
+        end
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Block",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoBlockEnabled = Value
+        if Value then
+            task.spawn(AutoBlock)
+        end
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "Auto Dodge",
+    CurrentValue = false,
+    Callback = function(Value)
+        AutoDodgeEnabled = Value
+        if Value then
+            task.spawn(AutoDodge)
+        end
+    end
+})
+
+-- Punch Delay Slider in Combat Tab
+CombatTab:CreateSlider({
+    Name = "Punch Delay",
+    Range = {0.1, 1},  -- Minimum and maximum delay range
+    Increment = 0.1,
+    CurrentValue = 0.2,  -- Default value
+    Callback = function(Value)
+        PunchDelay = Value
+    end
+})
+
+-- Misc Tab
+MiscTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 100},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = Value
+        end
+    end
+})
+
+MiscTab:CreateToggle({
+    Name = "FPS Boost",
+    CurrentValue = false,
+    Callback = function(Value)
+        FPSBoostEnabled = Value
+        if Value then
+            task.spawn(FPSBoost)
+        end
+    end
+})
+
+-- Infinite Stamina Toggle
+getgenv().InfStamina = false
+
+MiscTab:CreateToggle({
+    Name = "Infinite Stamina",
+    CurrentValue = false,
+    Callback = function(Value)
+        getgenv().InfStamina = Value
+        Rayfield:Notify({
+            Title = "Infinite Stamina",
+            Content = Value and "Enabled" or "Disabled",
+            Duration = 2,
+        })
+    end,
+})
+
+-- Credits Tab
+CreditTab:CreateLabel("Credit to Fearz for making the script!")
+
+CreditTab:CreateButton({
+    Name = "Join Discord",
+    Callback = function()
+        setclipboard("https://discord.gg/rvXsdjcY")
+    end
+})
+
+Rayfield:Notify({
+    Title = "Script Loaded",
+    Content = "ShadowZ Boxing Beta Script V1.5 loaded successfully!",
+    Duration = 5,
+    Image = 4483362458
+})
+
+-- Hook stamina-related remote events to enforce infinite stamina
+local CmdrClient = ReplicatedStorage:WaitForChild("CmdrClient")
+local Commands = CmdrClient:WaitForChild("Commands")
+
+local remotesToModify = {
+    ["dodge-stamina-cost_945a61c5-c6aa-40c0-a614-0ffc65dd3285"] = true,
+    ["punch-stamina-cost_54b27ecc-8fa6-4984-8b86-3042994fb557"] = true,
+    ["set-stamina-amount_4b675cf3-d588-4d08-8cad-7906aa2dd6ab"] = true,
+}
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if getgenv().InfStamina and method == "FireServer" and typeof(self) == "Instance" and self:IsA("RemoteEvent") then
+        if remotesToModify[self.Name] then
+            local args = { ... }
+            -- Override stamina value to 0
+            if typeof(args[1]) == "number" then
+                args[1] = 0
+            elseif typeof(args[2]) == "number" then
+                args[2] = 0
+            end
+            return oldNamecall(self, unpack(args))
+        end
+    end
+    return oldNamecall(self, ...)
+end)
